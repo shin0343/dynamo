@@ -21,8 +21,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -31,14 +29,12 @@ import (
 
 	configv1alpha1 "github.com/ai-dynamo/dynamo/deploy/operator/api/config/v1alpha1"
 	nvidiacomv1beta2 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1beta2"
-	"github.com/ai-dynamo/dynamo/deploy/operator/internal/controller/aisimulate"
 	commonController "github.com/ai-dynamo/dynamo/deploy/operator/internal/controller_common"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -202,39 +198,13 @@ func (r *DynamoGraphDeploymentRequestV1beta2Reconciler) Reconcile(
 	return result, nil
 }
 
-// buildRun resolves the optional inputs of the Request into an immutable Run spec. The effective
-// AISimulate input is frozen into aisimulate.parameters: that object is the complete resolved input.
-// Run execution reads it with aisimulate.DecodeInput and never lowers the Run again, because the
-// merge-patch deletions (null) that shaped it are not part of the stored result.
+// buildRun snapshots the admitted typed input into an immutable Run. Admission has already
+// persisted Request defaults and discovered hardware. The Run controller lowers this snapshot once,
+// applies inputOverrides last, and records the exact effective input in status.aisimulate.input.
 func (r *DynamoGraphDeploymentRequestV1beta2Reconciler) buildRun(
 	request *nvidiacomv1beta2.DynamoGraphDeploymentRequest,
 ) (*nvidiacomv1beta2.DynamoGraphDeploymentRun, error) {
-	spec := &request.Spec
-	if spec.AISimulate == nil || spec.AISimulate.Image == "" {
-		return nil, errors.New("spec.aisimulate.image is required")
-	}
-	version, err := aisimulate.ResolveVersion(spec.AISimulate.Image, spec.AISimulate.VersionOverride)
-	if err != nil {
-		return nil, err
-	}
-	input, err := lowerDGDRV1beta2Input(spec)
-	if err != nil {
-		return nil, err
-	}
-	if !aisimulate.HardwareNamed(input) {
-		return nil, errors.New("the effective AISimulate input names no GPU SKU or budget; set spec.hardware.gpu")
-	}
-	raw, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("encode the effective AISimulate input: %w", err)
-	}
-
-	frozen := spec.NativeSearchInput.DeepCopy()
-	frozen.AISimulate = &nvidiacomv1beta2.AISimulateSpec{
-		Image:           spec.AISimulate.Image,
-		VersionOverride: version,
-		Parameters:      &runtime.RawExtension{Raw: raw},
-	}
+	frozen := request.Spec.NativeSearchInput.DeepCopy()
 	run := &nvidiacomv1beta2.DynamoGraphDeploymentRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        dgdrV1beta2RunName(request),

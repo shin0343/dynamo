@@ -19,15 +19,14 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	nvidiacomv1beta2 "github.com/ai-dynamo/dynamo/deploy/operator/api/v1beta2"
-	"github.com/ai-dynamo/dynamo/deploy/operator/internal/controller/aisimulate"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,8 +164,7 @@ func dgdrV1beta2Request(withHardware bool) *nvidiacomv1beta2.DynamoGraphDeployme
 	}
 	request.Spec.Model = &nvidiacomv1beta2.ModelSpec{Name: "Qwen/Qwen3-0.6B"}
 	request.Spec.AISimulate = &nvidiacomv1beta2.AISimulateSpec{
-		Image:           "example.com/aisimulate:latest",
-		VersionOverride: "0.13.0",
+		InputOverrides: &runtime.RawExtension{Raw: []byte(`{"sweep":{"max_trials":7}}`)},
 	}
 	if withHardware {
 		sku, budget := "h100_sxm", int32(4)
@@ -187,10 +185,11 @@ func dgdrV1beta2AcceptedCondition(t *testing.T, request *nvidiacomv1beta2.Dynamo
 }
 
 func TestV1beta2RequestControllerCreatesTheRunOfTheCurrentGeneration(t *testing.T) {
+	requestInput := dgdrV1beta2Request(true).Spec.NativeSearchInput.DeepCopy()
 	f := newDGDRV1beta2Fixture(t, dgdrV1beta2Request(true))
 	f.reconcile()
 
-	t.Log("One Run exists, owned by the Request, with the resolved and frozen input")
+	t.Log("One Run exists, owned by the Request, with the admitted typed input snapshot")
 	run := &nvidiacomv1beta2.DynamoGraphDeploymentRun{}
 	if err := f.client.Get(t.Context(), types.NamespacedName{Namespace: "default", Name: "search-1"}, run); err != nil {
 		t.Fatalf("get run: %v", err)
@@ -198,16 +197,11 @@ func TestV1beta2RequestControllerCreatesTheRunOfTheCurrentGeneration(t *testing.
 	if !metav1.IsControlledBy(run, f.request()) {
 		t.Fatal("run is not controlled by the request")
 	}
-	if got := run.Spec.AISimulate.VersionOverride; got != "0.13.0" {
-		t.Fatalf("run versionOverride = %q, want the resolved 0.13.0", got)
+	if !apiequality.Semantic.DeepEqual(run.Spec.NativeSearchInput, *requestInput) {
+		t.Fatalf("run input = %#v, want the admitted Request snapshot %#v", run.Spec.NativeSearchInput, *requestInput)
 	}
-	parameters, err := frozenInputForTest(run)
-	if err != nil {
-		t.Fatalf("input of the run: %v", err)
-	}
-	searchSpace, _ := parameters["search_space"].(map[string]any)
-	if searchSpace["hardware_sku"] != "h100_sxm" || searchSpace["gpu_budget"] != float64(4) {
-		t.Fatalf("frozen search_space = %v, want the hardware of the request", searchSpace)
+	if run.Status.AISimulate != nil {
+		t.Fatalf("status.aisimulate = %#v, want the Run controller to lower and record it", run.Status.AISimulate)
 	}
 
 	t.Log("The status records the accepted generation and the active Run")
@@ -337,19 +331,19 @@ func TestV1beta2RequestControllerCountsAnUnlabeledOwnedRunAsActive(t *testing.T)
 	}
 }
 
-func TestV1beta2RequestControllerCreatesNoRunWithoutHardware(t *testing.T) {
+func TestV1beta2RequestControllerDoesNotRepeatAdmissionValidation(t *testing.T) {
 	f := newDGDRV1beta2Fixture(t, dgdrV1beta2Request(false))
 	f.reconcile()
-	if names := f.runNames(); len(names) != 0 {
-		t.Fatalf("runs = %v, want none", names)
+	if names := f.runNames(); len(names) != 1 || names[0] != "search-1" {
+		t.Fatalf("runs = %v, want the admitted Request snapshotted without controller-side validation", names)
 	}
 	request := f.request()
 	condition := dgdrV1beta2AcceptedCondition(t, request)
-	if condition.Status != metav1.ConditionFalse || condition.Reason != dgdrReasonInvalidSpec {
-		t.Fatalf("condition = %v, want False/%s", condition, dgdrReasonInvalidSpec)
+	if condition.Status != metav1.ConditionTrue || condition.Reason != dgdrReasonRunCreated {
+		t.Fatalf("condition = %v, want True/%s", condition, dgdrReasonRunCreated)
 	}
-	if request.Status.ObservedGeneration != 0 {
-		t.Fatalf("observedGeneration = %d, want 0 for a rejected generation", request.Status.ObservedGeneration)
+	if request.Status.ObservedGeneration != 1 {
+		t.Fatalf("observedGeneration = %d, want 1", request.Status.ObservedGeneration)
 	}
 }
 
@@ -468,14 +462,6 @@ func TestV1beta2RequestControllerReusesAnOwnedRunWhateverItsName(t *testing.T) {
 	if condition := dgdrV1beta2AcceptedCondition(t, live); condition.Status != metav1.ConditionTrue {
 		t.Fatalf("Accepted = %v, want True", condition)
 	}
-}
-
-// frozenInputForTest decodes the AISimulate input frozen into a Run.
-func frozenInputForTest(run *nvidiacomv1beta2.DynamoGraphDeploymentRun) (map[string]any, error) {
-	if run.Spec.AISimulate == nil || run.Spec.AISimulate.Parameters == nil {
-		return nil, errors.New("run has no spec.aisimulate.parameters")
-	}
-	return aisimulate.DecodeInput(run.Spec.AISimulate.Parameters.Raw)
 }
 
 func TestV1beta2RequestControllerPublishesStatusBeforeDeletingRetiredRuns(t *testing.T) {
@@ -625,31 +611,24 @@ func TestV1beta2RequestControllerDoesNotAdoptARunOfAnotherOwner(t *testing.T) {
 	}
 }
 
-func TestV1beta2RequestControllerKeepsNullDeletedKeysOutOfTheRunInput(t *testing.T) {
+func TestV1beta2RequestControllerPreservesInputOverridesForRunLowering(t *testing.T) {
 	request := dgdrV1beta2Request(true)
-	// The Request removes a typed value (workload isl) and a derived default (request_count) with null.
-	const spec = `{"model":{"name":"Qwen/Qwen3-0.6B"},"hardware":{"gpu":{"sku":"h100_sxm","budget":4}},` +
-		`"workload":{"static":{"isl":1024}},` +
-		`"aisimulate":{"image":"example.com/aisimulate:latest","versionOverride":"0.13.0",` +
-		`"parameters":{"workload":{"isl":null,"request_count":null}}}}`
-	request.Spec = nvidiacomv1beta2.DynamoGraphDeploymentRequestSpec{}
-	if err := json.Unmarshal([]byte(spec), &request.Spec); err != nil {
-		t.Fatalf("decode spec: %v", err)
-	}
+	const overrides = `{"workload":{"isl":null,"request_count":null}}`
+	request.Spec.AISimulate.InputOverrides = &runtime.RawExtension{Raw: []byte(overrides)}
 	f := newDGDRV1beta2Fixture(t, request)
 
 	run, err := f.reconciler.buildRun(request)
 	if err != nil {
 		t.Fatalf("build run: %v", err)
 	}
-	input, err := frozenInputForTest(run)
-	if err != nil {
-		t.Fatalf("input of the run: %v", err)
+	if run.Spec.AISimulate == nil || run.Spec.AISimulate.InputOverrides == nil {
+		t.Fatal("Run lost spec.aisimulate.inputOverrides")
 	}
-	workload, _ := input["workload"].(map[string]any)
-	for _, key := range []string{"isl", "request_count"} {
-		if value, found := workload[key]; found {
-			t.Errorf("workload.%s = %v in the Run input, want it absent: the deletion must stay", key, value)
-		}
+	if got := string(run.Spec.AISimulate.InputOverrides.Raw); got != overrides {
+		t.Fatalf("Run inputOverrides = %s, want %s", got, overrides)
+	}
+	request.Spec.AISimulate.InputOverrides.Raw[0] = '['
+	if got := string(run.Spec.AISimulate.InputOverrides.Raw); got != overrides {
+		t.Fatalf("Run inputOverrides changed with the Request: %s", got)
 	}
 }

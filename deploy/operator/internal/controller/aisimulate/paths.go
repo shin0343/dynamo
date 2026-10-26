@@ -19,23 +19,30 @@ package aisimulate
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-// Native input paths, in the snake_case spelling of the upstream AISimulate contract, for the
-// keys this package reads or derives. Where each API field lands in the native input is the
-// knowledge of whoever builds the underlay, not of this package. The paths are passed to the
-// unstructured helpers, which must not modify them.
+// Native input paths, in the snake_case spelling of the upstream AISimulate contract. They
+// address the same native key when the underlay is built and when derived defaults are read,
+// and are passed to the unstructured helpers, which must not modify them.
 var (
+	searchSpaceModelName   = []string{"search_space", "model_name"}
+	searchSpaceBackend     = []string{"search_space", "backend"}
 	searchSpaceHardwareSKU = []string{"search_space", "hardware_sku"}
 	searchSpaceGPUBudget   = []string{"search_space", "gpu_budget"}
 
 	workloadPath            = []string{"workload"}
+	workloadISL             = []string{"workload", "isl"}
+	workloadOSL             = []string{"workload", "osl"}
 	workloadNumRequestRatio = []string{"workload", "num_request_ratio"}
+	workloadRequestRate     = []string{"workload", "request_rate"}
+	workloadConcurrency     = []string{"workload", "concurrency"}
 	workloadKVLoadRatio     = []string{"workload", "kv_load_ratio"}
 	workloadRequestCount    = []string{"workload", "request_count"}
 
-	goalSLATTFTMs = []string{"goal", "sla", "ttft_ms"}
-	goalSLAITLMs  = []string{"goal", "sla", "itl_ms"}
-	goalSLAE2EMs  = []string{"goal", "sla", "e2e_ms"}
-	goalStrictSLA = []string{"goal", "strict_sla"}
+	goalTarget           = []string{"goal", "target"}
+	goalParetoObjectives = []string{"goal", "pareto_objectives"}
+	goalSLATTFTMs        = []string{"goal", "sla", "ttft_ms"}
+	goalSLAITLMs         = []string{"goal", "sla", "itl_ms"}
+	goalSLAE2EMs         = []string{"goal", "sla", "e2e_ms"}
+	goalStrictSLA        = []string{"goal", "strict_sla"}
 
 	sweepMaxTrials = []string{"sweep", "max_trials"}
 )
@@ -49,20 +56,4 @@ const TargetPareto = "pareto"
 func has(obj map[string]any, path ...string) bool {
 	_, found, _ := unstructured.NestedFieldNoCopy(obj, path...)
 	return found
-}
-
-// HardwareNamed reports whether the native input names both a GPU SKU and a GPU budget, as the
-// search needs. A null or blank value does not count: the key is deleted or left empty.
-func HardwareNamed(input map[string]any) bool {
-	return hasValue(input, searchSpaceHardwareSKU...) && hasValue(input, searchSpaceGPUBudget...)
-}
-
-// hasValue reports whether obj holds a non-null, non-blank value at the path.
-func hasValue(obj map[string]any, path ...string) bool {
-	value, found, err := unstructured.NestedFieldNoCopy(obj, path...)
-	if err != nil || !found || value == nil {
-		return false
-	}
-	text, isString := value.(string)
-	return !isString || text != ""
 }

@@ -57,9 +57,9 @@ spec:
               type: object
             spec:
               description: |-
-                DynamoGraphDeploymentRunSpec is an immutable, resolved copy of an accepted DGDR spec.
-                Run creators resolve optional Request inputs and the final AISimulate parameters before
-                persisting the Run. Request admission defaulting does not apply to Runs.
+                DynamoGraphDeploymentRunSpec is an immutable copy of an accepted, defaulted DGDR input.
+                Request admission persists structural defaults and discovered hardware before the Request
+                controller creates this snapshot. Request admission defaulting does not apply to Runs.
               properties:
                 aisimulate:
                   description: AISimulate supplies native input to the operator's AISimulate execution bundle.
