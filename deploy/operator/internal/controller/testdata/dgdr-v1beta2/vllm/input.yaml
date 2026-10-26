@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvidia.com/v1beta2
+kind: DynamoGraphDeploymentRequest
+metadata:
+  name: aisimulate-vllm
+spec:
+  model:
+    name: Qwen/Qwen3-32B
+  backends:
+    - vllm
+  hardware:
+    gpu:
+      sku: h200_sxm
+      budget: 2
+  workload:
+    static:
+      isl: 1024
+      osl: 128
+      concurrency: 10
+  objective:
+    mode: Optimize
+    metric: ThroughputPerGPU
+    sla: {}
+  aisimulate:
+    inputOverrides:
+      search_space:
+        deployment_mode:
+          - agg
+        context_length: 32768
+      workload:
+        request_count: 8
+      sweep:
+        max_rounds: 1
+        candidates_per_round: 1
+        parallel_evals: 1
+        max_eval_seconds: 120
+      dgdr_run:
+        generator: direct
+  recommendation:
+    maxCandidates: 1
