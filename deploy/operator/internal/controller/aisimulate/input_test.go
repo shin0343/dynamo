@@ -339,6 +339,25 @@ func TestInputOverridesApplyOnceAfterDerivedDefaults(t *testing.T) {
 	})
 }
 
+func TestLowerWithUnderlayKeepsInputOverridesAuthoritative(t *testing.T) {
+	spec := withInputOverrides(defaultedSpec(), `{"dgdr_run":{"name":"custom","runtime_image":null}}`)
+	input, err := LowerWithUnderlay(&spec.NativeSearchInput, map[string]any{"dgdr_run": map[string]any{
+		"name": "default", "runtime_image": "planner:1.2.3", "max_candidates": int64(1),
+	}})
+	if err != nil {
+		t.Fatalf("LowerWithUnderlay: %v", err)
+	}
+	if nested(t, input, "dgdr_run", "name") != "custom" {
+		t.Fatalf("input override did not replace the execution name: %s", encode(t, input))
+	}
+	if nested(t, input, "dgdr_run", "runtime_image") != nil {
+		t.Fatalf("input override did not delete the runtime image: %s", encode(t, input))
+	}
+	if nested(t, input, "dgdr_run", "max_candidates") != float64(1) {
+		t.Fatalf("static execution underlay was lost: %s", encode(t, input))
+	}
+}
+
 func TestUnderlayParetoObjective(t *testing.T) {
 	spec := defaultedSpec()
 	spec.Objective.Mode = v1beta2.ObjectiveModePareto

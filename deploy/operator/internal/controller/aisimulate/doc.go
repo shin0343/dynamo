@@ -33,6 +33,6 @@
 // defaults, and are applied once, last.
 //
 // The document stays unstructured (map[string]any) because its schema belongs to the
-// AISimulate release the Request selects, not to this package. Reads and writes go
-// through the helpers of k8s.io/apimachinery/pkg/apis/meta/v1/unstructured.
+// AISimulate release bundled in the operator-configured planner image, not to this package.
+// Reads and writes go through the helpers of k8s.io/apimachinery/pkg/apis/meta/v1/unstructured.
 package aisimulate

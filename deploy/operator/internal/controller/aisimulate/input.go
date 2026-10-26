@@ -32,14 +32,29 @@ import (
 // lowering repeats none of them. The only error is malformed inputOverrides (not a JSON
 // object); semantic problems are the caller's to validate.
 func Lower(spec *v1beta2.NativeSearchInput) (map[string]any, error) {
+	return LowerWithUnderlay(spec, nil)
+}
+
+// LowerWithUnderlay returns the effective native input with a controller-owned static underlay
+// beneath the typed API fields and derived defaults. InputOverrides remains the final merge patch,
+// so it may override or delete fields from either underlay.
+func LowerWithUnderlay(spec *v1beta2.NativeSearchInput, staticUnderlay map[string]any) (map[string]any, error) {
 	overrides, err := InputOverrides(spec)
 	if err != nil {
 		return nil, err
 	}
-	underlay, err := Underlay(spec)
+	typedUnderlay, err := Underlay(spec)
 	if err != nil {
 		return nil, err
 	}
+	underlay, err := normalize(staticUnderlay)
+	if err != nil {
+		return nil, err
+	}
+	if underlay == nil {
+		underlay = map[string]any{}
+	}
+	underlay, _ = mergePatch(underlay, typedUnderlay).(map[string]any)
 	if underlay, err = normalize(underlay); err != nil {
 		return nil, err
 	}
