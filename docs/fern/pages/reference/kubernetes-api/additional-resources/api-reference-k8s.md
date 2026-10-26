@@ -3442,6 +3442,7 @@ DynamoGraphDeploymentRequest is the Schema for simulation-backed deployment sear
 
 
 DynamoGraphDeploymentRequestNativeSpec contains the native v1beta2 request fields.
+Admission persists Request defaults before the controller snapshots this input into a Run.
 
 
 
@@ -3451,12 +3452,12 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `model` _[ModelSpec](#modelspec)_ | Model identifies the model whose deployment configurations are evaluated. |  | Optional: \{\} <br /> |
-| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by generated candidates. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
-| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />Admission discovers any omitted hardware values from the cluster. |  | Optional: \{\} <br /> |
-| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />When omitted, admission supplies a static shape of ISL 1024, OSL 128 and concurrency 10;<br />an explicit empty workload receives the same shape from admission. An explicit<br />workload.static: \{\} opts out of that shape, leaving the workload to<br />spec.aisimulate.inputOverrides.workload. spec.aisimulate.inputOverrides.workload overrides the<br />fields it names.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
-| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />When omitted, admission supplies the object. Its mode defaults to Optimize, and admission<br />supplies the conditional scalar metric. |  | Optional: \{\} <br /> |
+| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by<br />generated candidates. For a Request, admission defaults an omitted list to vllm,<br />sglang, and trtllm. An explicit list is preserved. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
+| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />For a Request, omitting hardware, using hardware: \{\}, or using gpu: \{\} requests<br />automatic discovery. Admission persists a complete typed SKU and budget or rejects<br />the write. InputOverrides remains opaque to admission and may override either value later. |  | Optional: \{\} <br /> |
+| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />For a Request, an omitted or empty workload receives a static shape of ISL 1024,<br />OSL 128, and concurrency 10. workload.static: \{\} opts out and contributes no typed<br />workload fields. InputOverrides may supply or override the native workload later.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
+| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />For a Request, an omitted or empty objective receives Optimize, ThroughputPerGPU,<br />and SLA bounds of TTFT 2000 ms and ITL 30 ms. objective.sla: \{\} opts out only<br />of the SLA defaults; mode and the conditional metric default still apply. |  | Optional: \{\} <br /> |
 | `aisimulate` _[AISimulateSpec](#aisimulatespec)_ | AISimulate supplies native input to the operator's AISimulate execution bundle. |  | Optional: \{\} <br /> |
-| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. |  | Optional: \{\} <br /> |
+| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. For a Request,<br />admission creates an omitted object and defaults maxCandidates to 1. |  | Optional: \{\} <br /> |
 
 
 #### v1beta2 DynamoGraphDeploymentRequestNativeStatus
@@ -3493,12 +3494,12 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `model` _[ModelSpec](#modelspec)_ | Model identifies the model whose deployment configurations are evaluated. |  | Optional: \{\} <br /> |
-| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by generated candidates. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
-| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />Admission discovers any omitted hardware values from the cluster. |  | Optional: \{\} <br /> |
-| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />When omitted, admission supplies a static shape of ISL 1024, OSL 128 and concurrency 10;<br />an explicit empty workload receives the same shape from admission. An explicit<br />workload.static: \{\} opts out of that shape, leaving the workload to<br />spec.aisimulate.inputOverrides.workload. spec.aisimulate.inputOverrides.workload overrides the<br />fields it names.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
-| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />When omitted, admission supplies the object. Its mode defaults to Optimize, and admission<br />supplies the conditional scalar metric. |  | Optional: \{\} <br /> |
+| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by<br />generated candidates. For a Request, admission defaults an omitted list to vllm,<br />sglang, and trtllm. An explicit list is preserved. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
+| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />For a Request, omitting hardware, using hardware: \{\}, or using gpu: \{\} requests<br />automatic discovery. Admission persists a complete typed SKU and budget or rejects<br />the write. InputOverrides remains opaque to admission and may override either value later. |  | Optional: \{\} <br /> |
+| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />For a Request, an omitted or empty workload receives a static shape of ISL 1024,<br />OSL 128, and concurrency 10. workload.static: \{\} opts out and contributes no typed<br />workload fields. InputOverrides may supply or override the native workload later.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
+| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />For a Request, an omitted or empty objective receives Optimize, ThroughputPerGPU,<br />and SLA bounds of TTFT 2000 ms and ITL 30 ms. objective.sla: \{\} opts out only<br />of the SLA defaults; mode and the conditional metric default still apply. |  | Optional: \{\} <br /> |
 | `aisimulate` _[AISimulateSpec](#aisimulatespec)_ | AISimulate supplies native input to the operator's AISimulate execution bundle. |  | Optional: \{\} <br /> |
-| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. |  | Optional: \{\} <br /> |
+| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. For a Request,<br />admission creates an omitted object and defaults maxCandidates to 1. |  | Optional: \{\} <br /> |
 | `v1beta1` _[JSON](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#json-v1-apiextensions-k8s-io)_ | V1Beta1 losslessly preserves a native v1beta1 spec while this object is<br />represented through v1beta2. It is mutually exclusive with native fields.<br />This field is a read-only conversion view; modify the request through the<br />native v1beta1 API. |  | Type: object <br />Optional: \{\} <br /> |
 
 
@@ -3546,7 +3547,8 @@ DynamoGraphDeploymentRun is one immutable accepted DGDR request and its executio
 
 
 DynamoGraphDeploymentRunSpec is an immutable, resolved copy of an accepted DGDR spec.
-Run creators resolve optional Request inputs before persisting the Run.
+Run creators resolve optional Request inputs and the final AISimulate parameters before
+persisting the Run. Request admission defaulting does not apply to Runs.
 
 
 
@@ -3556,12 +3558,12 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `model` _[ModelSpec](#modelspec)_ | Model identifies the model whose deployment configurations are evaluated. |  | Optional: \{\} <br /> |
-| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by generated candidates. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
-| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />Admission discovers any omitted hardware values from the cluster. |  | Optional: \{\} <br /> |
-| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />When omitted, admission supplies a static shape of ISL 1024, OSL 128 and concurrency 10;<br />an explicit empty workload receives the same shape from admission. An explicit<br />workload.static: \{\} opts out of that shape, leaving the workload to<br />spec.aisimulate.inputOverrides.workload. spec.aisimulate.inputOverrides.workload overrides the<br />fields it names.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
-| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />When omitted, admission supplies the object. Its mode defaults to Optimize, and admission<br />supplies the conditional scalar metric. |  | Optional: \{\} <br /> |
+| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by<br />generated candidates. For a Request, admission defaults an omitted list to vllm,<br />sglang, and trtllm. An explicit list is preserved. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
+| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />For a Request, omitting hardware, using hardware: \{\}, or using gpu: \{\} requests<br />automatic discovery. Admission persists a complete typed SKU and budget or rejects<br />the write. InputOverrides remains opaque to admission and may override either value later. |  | Optional: \{\} <br /> |
+| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />For a Request, an omitted or empty workload receives a static shape of ISL 1024,<br />OSL 128, and concurrency 10. workload.static: \{\} opts out and contributes no typed<br />workload fields. InputOverrides may supply or override the native workload later.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
+| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />For a Request, an omitted or empty objective receives Optimize, ThroughputPerGPU,<br />and SLA bounds of TTFT 2000 ms and ITL 30 ms. objective.sla: \{\} opts out only<br />of the SLA defaults; mode and the conditional metric default still apply. |  | Optional: \{\} <br /> |
 | `aisimulate` _[AISimulateSpec](#aisimulatespec)_ | AISimulate supplies native input to the operator's AISimulate execution bundle. |  | Optional: \{\} <br /> |
-| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. |  | Optional: \{\} <br /> |
+| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. For a Request,<br />admission creates an omitted object and defaults maxCandidates to 1. |  | Optional: \{\} <br /> |
 
 
 #### DynamoGraphDeploymentRunStatus
@@ -3623,8 +3625,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `sku` _string_ | SKU identifies the accelerator using the AISimulate hardware catalog name.<br />When omitted, admission discovers the accelerator from the cluster. |  | MinLength: 1 <br />Optional: \{\} <br /> |
-| `budget` _integer_ | Budget is the maximum total number of GPUs one candidate may use.<br />When omitted, admission derives the available GPU budget from the cluster. |  | Minimum: 1 <br />Optional: \{\} <br /> |
+| `sku` _string_ | SKU identifies the accelerator using the AISimulate hardware catalog name.<br />For a Request, admission discovers an omitted SKU from the cluster. Discovery<br />rejects an unknown accelerator and an ambiguous cluster with multiple GPU types. |  | MinLength: 1 <br />Optional: \{\} <br /> |
+| `budget` _integer_ | Budget is the maximum total number of GPUs one candidate may use.<br />For a Request, admission defaults an omitted budget to the number of matching<br />cluster GPUs, capped at 32. An explicit budget is authoritative and is not capped. |  | Minimum: 1 <br />Optional: \{\} <br /> |
 
 
 #### v1beta2 HardwareSpec
@@ -3643,7 +3645,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `gpu` _[GPUHardwareSpec](#gpuhardwarespec)_ | GPU describes accelerator identity and the maximum allocation per candidate.<br />Omitted fields are resolved independently by admission. |  | Optional: \{\} <br /> |
+| `gpu` _[GPUHardwareSpec](#gpuhardwarespec)_ | GPU describes accelerator identity and the maximum allocation per candidate.<br />For a Request, admission resolves omitted fields independently. It reads the<br />cluster on create and on an update that changes hardware, but not on an update<br />that leaves hardware unchanged. Supplying both fields avoids cluster discovery. |  | Optional: \{\} <br /> |
 
 
 #### KVLoadRatio
@@ -3687,8 +3689,9 @@ _Appears in:_
 
 
 
-NativeSearchInput defines the v1beta2 search input shared by Requests and
-immutable Runs.
+NativeSearchInput defines the v1beta2 search input shared by Requests and immutable Runs.
+The admission defaults documented below apply to native Requests. A Run is a fully
+resolved snapshot and does not receive Request defaults.
 
 
 
@@ -3700,12 +3703,12 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `model` _[ModelSpec](#modelspec)_ | Model identifies the model whose deployment configurations are evaluated. |  | Optional: \{\} <br /> |
-| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by generated candidates. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
-| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />Admission discovers any omitted hardware values from the cluster. |  | Optional: \{\} <br /> |
-| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />When omitted, admission supplies a static shape of ISL 1024, OSL 128 and concurrency 10;<br />an explicit empty workload receives the same shape from admission. An explicit<br />workload.static: \{\} opts out of that shape, leaving the workload to<br />spec.aisimulate.inputOverrides.workload. spec.aisimulate.inputOverrides.workload overrides the<br />fields it names.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
-| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />When omitted, admission supplies the object. Its mode defaults to Optimize, and admission<br />supplies the conditional scalar metric. |  | Optional: \{\} <br /> |
+| `backends` _[Backend](#backend) array_ | Backends lists one or more inference backends searched by AISimulate and used by<br />generated candidates. For a Request, admission defaults an omitted list to vllm,<br />sglang, and trtllm. An explicit list is preserved. |  | Enum: [vllm sglang trtllm] <br />MinItems: 1 <br />Optional: \{\} <br /> |
+| `hardware` _[HardwareSpec](#v1beta2-hardwarespec)_ | Hardware bounds the accelerator configurations evaluated by the search.<br />For a Request, omitting hardware, using hardware: \{\}, or using gpu: \{\} requests<br />automatic discovery. Admission persists a complete typed SKU and budget or rejects<br />the write. InputOverrides remains opaque to admission and may override either value later. |  | Optional: \{\} <br /> |
+| `workload` _[WorkloadSpec](#v1beta2-workloadspec)_ | Workload defines the synthetic traffic model used for every candidate evaluation.<br />For a Request, an omitted or empty workload receives a static shape of ISL 1024,<br />OSL 128, and concurrency 10. workload.static: \{\} opts out and contributes no typed<br />workload fields. InputOverrides may supply or override the native workload later.<br />The default evaluates a fixed concurrency, so it creates neither sweep.max_trials nor a<br />KV-load ratio search. |  | Optional: \{\} <br /> |
+| `objective` _[ObjectiveSpec](#objectivespec)_ | Objective defines scalar optimization or a multi-objective Pareto search.<br />For a Request, an omitted or empty objective receives Optimize, ThroughputPerGPU,<br />and SLA bounds of TTFT 2000 ms and ITL 30 ms. objective.sla: \{\} opts out only<br />of the SLA defaults; mode and the conditional metric default still apply. |  | Optional: \{\} <br /> |
 | `aisimulate` _[AISimulateSpec](#aisimulatespec)_ | AISimulate supplies native input to the operator's AISimulate execution bundle. |  | Optional: \{\} <br /> |
-| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. |  | Optional: \{\} <br /> |
+| `recommendation` _[RecommendationSpec](#recommendationspec)_ | Recommendation controls bounded projection into DGDC resources. For a Request,<br />admission creates an omitted object and defaults maxCandidates to 1. |  | Optional: \{\} <br /> |
 
 
 #### ObjectiveMetric
@@ -3744,8 +3747,9 @@ _Appears in:_
 
 
 
-ObjectiveSLASpec defines per-request latency bounds used to calculate goodput.
-An empty object disables SLA filtering.
+ObjectiveSLASpec defines per-request latency bounds used to calculate goodput. Admission
+does not default its individual fields when the object already exists, so an empty object
+disables the model-only SLA default and SLA filtering.
 
 
 
@@ -3775,10 +3779,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `mode` _[ObjectiveMode](#objectivemode)_ | Mode selects scalar optimization or a Pareto search. |  | Enum: [Optimize Pareto] <br />Optional: \{\} <br /> |
-| `metric` _[ObjectiveMetric](#objectivemetric)_ | Metric is the scalar target when mode is Optimize.<br />When omitted in Optimize mode, admission defaults it to Throughput. |  | Enum: [Throughput ThroughputPerGPU ThroughputPerUser TTFT E2ELatency Goodput GoodputPerGPU] <br />Optional: \{\} <br /> |
+| `mode` _[ObjectiveMode](#objectivemode)_ | Mode selects scalar optimization or a Pareto search.<br />For a Request, admission defaults an omitted mode to Optimize. |  | Enum: [Optimize Pareto] <br />Optional: \{\} <br /> |
+| `metric` _[ObjectiveMetric](#objectivemetric)_ | Metric is the scalar target when mode is Optimize.<br />For a Request in Optimize mode, admission defaults an omitted metric to<br />ThroughputPerGPU. Pareto mode has no scalar metric default. |  | Enum: [Throughput ThroughputPerGPU ThroughputPerUser TTFT E2ELatency Goodput GoodputPerGPU] <br />Optional: \{\} <br /> |
 | `metrics` _[ObjectiveMetric](#objectivemetric) array_ | Metrics lists two or more distinct scalar targets when mode is Pareto. |  | Enum: [Throughput ThroughputPerGPU ThroughputPerUser TTFT E2ELatency Goodput GoodputPerGPU] <br />MaxItems: 7 <br />MinItems: 2 <br />Optional: \{\} <br /> |
-| `sla` _[ObjectiveSLASpec](#objectiveslaspec)_ | SLA defines per-request latency bounds used to calculate goodput. When omitted, no<br />bounds apply. spec.aisimulate.inputOverrides.goal.sla overrides the bounds it names. |  | Optional: \{\} <br /> |
+| `sla` _[ObjectiveSLASpec](#objectiveslaspec)_ | SLA defines per-request latency bounds used to calculate goodput. For a Request,<br />admission defaults an omitted SLA to TTFT 2000 ms and ITL 30 ms. An existing SLA<br />object is preserved exactly as written, so sla: \{\} opts out of these defaults.<br />spec.aisimulate.inputOverrides.goal.sla overrides the bounds it names. |  | Optional: \{\} <br /> |
 
 
 #### RecommendationSpec
@@ -3797,7 +3801,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `maxCandidates` _integer_ | MaxCandidates is the maximum number of DGDCs owned by one run. Scalar<br />candidates are ordered best first; Pareto candidates have no scalar rank.<br />This field does not limit internal trials. |  | Maximum: 100 <br />Minimum: 1 <br />Optional: \{\} <br /> |
+| `maxCandidates` _integer_ | MaxCandidates is the maximum number of DGDCs owned by one run. Scalar<br />candidates are ordered best first; Pareto candidates have no scalar rank.<br />This field does not limit internal trials. For a Request, admission defaults<br />the zero value, including omission, to 1. |  | Maximum: 100 <br />Minimum: 1 <br />Optional: \{\} <br /> |
 
 
 #### ResourceReference
@@ -3838,7 +3842,8 @@ _Appears in:_
 
 
 
-StaticWorkloadSpec defines one of AISimulate's synthetic workload shapes.
+StaticWorkloadSpec defines one of AISimulate's synthetic workload shapes. Admission
+does not default its individual fields when the object already exists.
 
 
 
@@ -3871,7 +3876,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `static` _[StaticWorkloadSpec](#staticworkloadspec)_ | Static defines one of AISimulate's synthetic workload shapes. Its fields are not<br />defaulted individually: the default belongs to spec.workload as a whole, so an<br />explicit workload object keeps exactly the fields it names. |  | Optional: \{\} <br /> |
+| `static` _[StaticWorkloadSpec](#staticworkloadspec)_ | Static defines one of AISimulate's synthetic workload shapes. For a Request whose<br />workload is omitted or empty, admission creates this object with ISL 1024, OSL 128,<br />and concurrency 10. An existing static object is preserved exactly as written, so<br />static: \{\} opts out of the model-only workload default. |  | Optional: \{\} <br /> |
 
 
 
